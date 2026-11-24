@@ -15,11 +15,12 @@ SCOPES = [
 
 class SheetsService:
     @staticmethod
-    def get_auth_url(state: str = "") -> str:
-        """Generates Google OAuth2 consent URL without heavy SDK."""
+    def get_auth_url(state: str = "", redirect_uri: Optional[str] = None) -> str:
+        """Generates Google OAuth2 consent URL."""
+        effective_redirect = redirect_uri or settings.google_redirect_uri
         params = {
             "client_id": settings.google_client_id,
-            "redirect_uri": settings.google_redirect_uri,
+            "redirect_uri": effective_redirect,
             "response_type": "code",
             "scope": " ".join(SCOPES),
             "access_type": "offline",
@@ -29,13 +30,14 @@ class SheetsService:
         return f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
 
     @staticmethod
-    async def exchange_code(code: str) -> Dict[str, Any]:
+    async def exchange_code(code: str, redirect_uri: Optional[str] = None) -> Dict[str, Any]:
         """Exchanges Google auth code for refresh and access tokens."""
+        effective_redirect = redirect_uri or settings.google_redirect_uri
         data = {
             "code": code,
             "client_id": settings.google_client_id,
             "client_secret": settings.google_client_secret,
-            "redirect_uri": settings.google_redirect_uri,
+            "redirect_uri": effective_redirect,
             "grant_type": "authorization_code"
         }
         async with httpx.AsyncClient() as client:

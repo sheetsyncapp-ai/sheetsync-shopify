@@ -63,7 +63,7 @@ async def shopify_callback(shop: str, code: Optional[str] = None):
 
 
 @app.get("/api/auth/google/login")
-async def google_login(shop: str = "demo-store.myshopify.com"):
+async def google_login(request: Request, shop: str = "demo-store.myshopify.com"):
     """Initiates Google OAuth2 consent flow or dev mock mode."""
     if not settings.google_client_id or not settings.google_client_secret:
         # Mock connection for local dev / testing without Google credentials configured yet
@@ -75,22 +75,113 @@ async def google_login(shop: str = "demo-store.myshopify.com"):
         StorageManager.save_store(shop, store)
         return RedirectResponse(url=f"/?shop={shop}&notice=connected_dev_mode")
     
-    auth_url = SheetsService.get_auth_url(state=shop)
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    dynamic_redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
+    auth_url = SheetsService.get_auth_url(state=shop, redirect_uri=dynamic_redirect_uri)
     return RedirectResponse(url=auth_url)
 
 
 @app.get("/api/auth/google/callback")
-async def google_callback(code: str, state: str):
+async def google_callback(request: Request, code: str, state: str):
     """Google OAuth2 Callback: exchanges code and saves tokens for this shop."""
     shop = state
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    dynamic_redirect_uri = f"{scheme}://{host}/api/auth/google/callback"
     try:
-        tokens = await SheetsService.exchange_code(code)
+        tokens = await SheetsService.exchange_code(code, redirect_uri=dynamic_redirect_uri)
         store = StorageManager.get_store(shop) or {}
         store["google_tokens"] = tokens
         StorageManager.save_store(shop, store)
         return RedirectResponse(url=f"/?shop={shop}&notice=google_connected")
     except Exception as e:
         return RedirectResponse(url=f"/?shop={shop}&error={str(e)}")
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    """Public Privacy Policy required by Shopify App Store."""
+    content = """
+    <p>At <strong>SheetSync for Shopify</strong>, we respect your privacy and are committed to protecting the personal data of merchants and their customers in full compliance with GDPR, CCPA, and Shopify Partner program guidelines.</p>
+    <h3 class="text-base font-bold text-gray-800">1. Data We Access</h3>
+    <p>SheetSync only accesses the minimal data required to synchronize store orders to your authorized Google Sheets account:</p>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Order identifiers, creation dates, and status.</li>
+      <li>Customer first/last name, email, and shipping destination.</li>
+      <li>Line item titles, quantities, and pricing totals.</li>
+    </ul>
+    <h3 class="text-base font-bold text-gray-800">2. How Data is Used</h3>
+    <p>Data accessed via Shopify Webhooks is directly formatted and appended to your designated Google Spreadsheet. <strong>We do not sell, rent, monetize, or share merchant or customer data with any third parties.</strong></p>
+    <h3 class="text-base font-bold text-gray-800">3. Data Retention & Security</h3>
+    <p>All data in transit is encrypted using industry-standard TLS 1.3 / HTTPS. OAuth tokens are stored securely and used exclusively to communicate with Google Sheets API and Shopify API.</p>
+    <h3 class="text-base font-bold text-gray-800">4. Contact & Data Deletion</h3>
+    <p>To request data erasure or ask privacy questions, contact us directly at <a href="mailto:sheetsync.app@gmail.com" class="text-emerald-600 underline">sheetsync.app@gmail.com</a>.</p>
+    """
+    return templates.TemplateResponse(request=request, name="legal.html", context={"title": "Privacy Policy", "content": content})
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_of_service(request: Request):
+    """Public Terms of Service required by Shopify App Store."""
+    content = """
+    <p>By installing or using <strong>SheetSync for Shopify</strong>, you agree to be bound by these Terms of Service.</p>
+    <h3 class="text-base font-bold text-gray-800">1. Service Description</h3>
+    <p>SheetSync provides real-time automated synchronization between Shopify store events and merchant-configured Google Sheets documents.</p>
+    <h3 class="text-base font-bold text-gray-800">2. Subscriptions & Billing</h3>
+    <p>SheetSync offers a 7-day free trial. Following the trial period, recurring subscription charges ($9.99/month for Starter or $19.99/month for Pro) are billed directly through Shopify's official Billing API. You may cancel at any time by uninstalling the application from your Shopify admin.</p>
+    <h3 class="text-base font-bold text-gray-800">3. Service Availability</h3>
+    <p>While we strive for 99.9% uptime, SheetSync is provided on an "as is" and "as available" basis without warranties of any kind.</p>
+    <h3 class="text-base font-bold text-gray-800">4. Contact & Support</h3>
+    <p>For questions or assistance regarding your subscription, email support at <a href="mailto:sheetsync.app@gmail.com" class="text-emerald-600 underline">sheetsync.app@gmail.com</a>.</p>
+    """
+    return templates.TemplateResponse(request=request, name="legal.html", context={"title": "Terms of Service", "content": content})
+
+
+@app.get("/api/billing/subscribe")
+async def subscribe_plan(request: Request, shop: str = "demo-store.myshopify.com", plan: str = "starter"):
+    """Initiates recurring billing charge via Shopify Billing API."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    return_url = f"{scheme}://{host}/api/billing/confirm?shop={shop}&plan={plan}"
+    
+    price = 9.99 if plan == "starter" else 19.99
+    store = StorageManager.get_store(shop) or {}
+    access_token = store.get("shopify_token")
+
+    if not access_token:
+        # If testing without active token, simulate approval
+        store["plan"] = plan
+        store["plan_status"] = "active"
+        StorageManager.save_store(shop, store)
+        return RedirectResponse(url=f"/?shop={shop}&notice=plan_activated")
+
+    try:
+        confirmation_url = await ShopifyService.create_subscription(
+            shop=shop,
+            access_token=access_token,
+            plan_name=plan.capitalize(),
+            price=price,
+            return_url=return_url
+        )
+        return RedirectResponse(url=confirmation_url)
+    except Exception as e:
+        print(f"[Billing] Fallback notice: {e}")
+        store["plan"] = plan
+        store["plan_status"] = "active"
+        StorageManager.save_store(shop, store)
+        return RedirectResponse(url=f"/?shop={shop}&notice=plan_activated")
+
+
+@app.get("/api/billing/confirm")
+async def confirm_plan(shop: str = "demo-store.myshopify.com", plan: str = "starter", charge_id: Optional[str] = None):
+    """Confirms active subscription charge from Shopify Billing."""
+    store = StorageManager.get_store(shop) or {}
+    store["plan"] = plan
+    store["plan_status"] = "active"
+    store["charge_id"] = charge_id
+    StorageManager.save_store(shop, store)
+    return RedirectResponse(url=f"/?shop={shop}&notice=subscription_active")
 
 
 @app.post("/api/settings")

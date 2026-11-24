@@ -48,6 +48,56 @@ class ShopifyService:
             data = res.json()
             return data["access_token"]
 
+    @staticmethod
+    async def create_subscription(shop: str, access_token: str, plan_name: str, price: float, return_url: str) -> str:
+        """Creates a recurring subscription charge via Shopify GraphQL API and returns confirmation URL."""
+        graphql_url = f"https://{shop}/admin/api/2026-10/graphql.json"
+        query = """
+        mutation AppSubscriptionCreate($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $trialDays: Int) {
+          appSubscriptionCreate(name: $name, lineItems: $lineItems, returnUrl: $returnUrl, trialDays: $trialDays) {
+            userErrors {
+              field
+              message
+            }
+            confirmationUrl
+            appSubscription {
+              id
+              status
+            }
+          }
+        }
+        """
+        variables = {
+            "name": f"SheetSync {plan_name}",
+            "returnUrl": return_url,
+            "trialDays": 7,
+            "lineItems": [
+                {
+                    "plan": {
+                        "appRecurringPricingDetails": {
+                            "price": {
+                                "amount": price,
+                                "currencyCode": "USD"
+                            },
+                            "interval": "EVERY_30_DAYS"
+                        }
+                    }
+                }
+            ]
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": access_token
+        }
+        async with httpx.AsyncClient() as client:
+            res = await client.post(graphql_url, json={"query": query, "variables": variables}, headers=headers)
+            data = res.json()
+            sub_data = data.get("data", {}).get("appSubscriptionCreate", {})
+            errors = sub_data.get("userErrors", [])
+            if errors:
+                raise Exception(errors[0].get("message", "Error creating subscription"))
+            return sub_data.get("confirmationUrl")
+
 
 class StorageManager:
     """Simple JSON-based store configuration database (ideal for micro-apps and local dev)."""

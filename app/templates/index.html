@@ -61,8 +61,18 @@
       <div class="polaris-card p-5">
         <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Subscription Plan</span>
         <div class="flex items-baseline justify-between mt-2">
-          <span class="text-lg font-bold text-gray-900">Pro Plan ($19.99/mo)</span>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Active</span>
+          <span class="text-lg font-bold text-gray-900">
+            {% if store.plan == 'pro' %}
+              Pro Plan ($19.99/mo)
+            {% elif store.plan == 'starter' %}
+              Starter ($9.99/mo)
+            {% else %}
+              7-Day Free Trial
+            {% endif %}
+          </span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if store.plan_status == 'active' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+            {{ store.plan_status or "Trial" }}
+          </span>
         </div>
       </div>
     </div>
@@ -131,7 +141,7 @@
     </section>
 
     <!-- Step 3: Test & Live Simulation -->
-    <section class="polaris-card p-6">
+    <section class="polaris-card p-6 mb-6">
       <div class="flex flex-col md:flex-row md:items-center justify-between">
         <div>
           <h2 class="text-base font-semibold text-gray-800 flex items-center">
@@ -148,6 +158,67 @@
       </div>
       <div id="testResultBox" class="mt-4 hidden p-3 rounded-md text-xs"></div>
     </section>
+
+    <!-- Subscription Plans (Shopify Billing API) -->
+    <section class="polaris-card p-6 mb-8">
+      <div class="pb-4 border-b border-gray-100 mb-6">
+        <h2 class="text-base font-semibold text-gray-800 flex items-center">
+          <i class="fa-solid fa-credit-card text-emerald-600 mr-2"></i>
+          Subscription Plans (Shopify Billing)
+        </h2>
+        <p class="text-sm text-gray-500 mt-0.5">All plans include a 7-day free trial. Billed directly through your regular Shopify monthly invoice.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Starter Plan -->
+        <div class="border border-gray-200 rounded-lg p-5 relative hover:border-emerald-500 transition-colors">
+          <div class="flex justify-between items-baseline mb-2">
+            <h3 class="font-bold text-gray-900 text-lg">Starter</h3>
+            <span class="text-xl font-extrabold text-gray-900">$9.99<span class="text-xs font-normal text-gray-500">/mo</span></span>
+          </div>
+          <p class="text-xs text-gray-500 mb-4">Ideal for growing stores automating daily order spreadsheets.</p>
+          <ul class="text-xs text-gray-600 space-y-2 mb-6">
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> Up to 300 orders synced per month</li>
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> Real-time sync (< 2 seconds)</li>
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> Standard order field mapping</li>
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> 7-day free trial</li>
+          </ul>
+          <a href="/api/billing/subscribe?shop={{ shop }}&plan=starter" class="block text-center w-full py-2 px-4 border border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-md text-xs font-semibold">
+            {% if store.plan == 'starter' %}Current Plan{% else %}Start 7-Day Free Trial{% endif %}
+          </a>
+        </div>
+
+        <!-- Pro Plan -->
+        <div class="border-2 border-emerald-600 rounded-lg p-5 relative bg-emerald-50/20">
+          <span class="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Most Popular</span>
+          <div class="flex justify-between items-baseline mb-2">
+            <h3 class="font-bold text-gray-900 text-lg">Pro Unlimited</h3>
+            <span class="text-xl font-extrabold text-gray-900">$19.99<span class="text-xs font-normal text-gray-500">/mo</span></span>
+          </div>
+          <p class="text-xs text-gray-500 mb-4">Unlimited order volume and inventory synchronization.</p>
+          <ul class="text-xs text-gray-600 space-y-2 mb-6">
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> <strong>Unlimited</strong> orders synced</li>
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> Inventory level tracking</li>
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> Multiple worksheet tabs support</li>
+            <li><i class="fa-solid fa-check text-emerald-500 mr-1.5"></i> Priority email support</li>
+          </ul>
+          <a href="/api/billing/subscribe?shop={{ shop }}&plan=pro" class="block text-center w-full py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-sm">
+            {% if store.plan == 'pro' %}Current Plan{% else %}Start 7-Day Free Trial{% endif %}
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Links -->
+    <footer class="mt-12 text-center text-xs text-gray-400 pb-8 space-x-4">
+      <span>SheetSync for Shopify © 2026</span>
+      <span>•</span>
+      <a href="/privacy" target="_blank" class="text-gray-500 hover:underline">Privacy Policy</a>
+      <span>•</span>
+      <a href="/terms" target="_blank" class="text-gray-500 hover:underline">Terms of Service</a>
+      <span>•</span>
+      <a href="mailto:sheetsync.app@gmail.com" class="text-gray-500 hover:underline">Support</a>
+    </footer>
 
   </main>
 
