@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SheetSync for Shopify</title>
+  <!-- Tailwind CSS CDN for rapid Polaris-style styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f1f2f3; }
+    .polaris-card { background: white; border-radius: 8px; box-shadow: 0 0 0 1px rgba(63, 63, 68, 0.05), 0 1px 3px 0 rgba(63, 63, 68, 0.15); }
+    .btn-shopify { background-color: #008060; color: white; transition: background-color 0.15s ease-in-out; }
+    .btn-shopify:hover { background-color: #006e52; }
+    .btn-secondary { background-color: white; border: 1px solid #c9cccf; color: #202223; }
+    .btn-secondary:hover { background-color: #f6f6f7; }
+  </style>
+</head>
+<body class="text-gray-900 min-h-screen">
+
+  <!-- Top Header Navigation -->
+  <header class="bg-white border-b border-gray-200 py-3 px-6 sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded bg-emerald-600 flex items-center justify-center text-white font-bold text-lg">
+          <i class="fa-solid fa-file-excel"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-gray-800 leading-tight">SheetSync</h1>
+          <p class="text-xs text-gray-500">Real-time Shopify to Google Sheets Sync</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+          <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Service Active
+        </span>
+        <span class="text-xs text-gray-500 border-l border-gray-200 pl-3">Shop: <strong id="shopDomainDisplay">{{ shop }}</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-5xl mx-auto py-8 px-4 sm:px-6">
+
+    <!-- KPI / Overview Banner -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+      <div class="polaris-card p-5">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Synced Orders</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span class="text-2xl font-bold text-gray-900" id="syncCount">{{ store.synced_count or 0 }}</span>
+          <span class="text-xs text-emerald-600 font-medium"><i class="fa-solid fa-bolt mr-1"></i>Live Sync</span>
+        </div>
+      </div>
+      <div class="polaris-card p-5">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Connected Sheet</span>
+        <div class="mt-2 truncate">
+          <span class="text-sm font-semibold text-gray-800" id="currentSheetName">{{ store.sheet_title or "Not Connected" }}</span>
+          <p class="text-xs text-gray-400 truncate" id="currentSheetTab">Tab: {{ store.sheet_tab or "Orders" }}</p>
+        </div>
+      </div>
+      <div class="polaris-card p-5">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Subscription Plan</span>
+        <div class="flex items-baseline justify-between mt-2">
+          <span class="text-lg font-bold text-gray-900">Pro Plan ($19.99/mo)</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Active</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1: Connect Google Account -->
+    <section class="polaris-card p-6 mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-gray-100">
+        <div>
+          <h2 class="text-base font-semibold text-gray-800 flex items-center">
+            <span class="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-2 font-bold">1</span>
+            Google Account Integration
+          </h2>
+          <p class="text-sm text-gray-500 mt-0.5">Authorize SheetSync to write new order rows directly to your Google Sheets.</p>
+        </div>
+        <div class="mt-4 md:mt-0">
+          {% if store.google_tokens %}
+            <div class="flex items-center space-x-2">
+              <span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-md font-medium flex items-center">
+                <i class="fa-solid fa-circle-check mr-1.5 text-emerald-500"></i> Google Account Connected
+              </span>
+              <a href="/api/auth/google/login?shop={{ shop }}" class="btn-secondary px-3 py-1.5 text-xs rounded-md">Reconnect</a>
+            </div>
+          {% else %}
+            <a href="/api/auth/google/login?shop={{ shop }}" class="btn-shopify px-4 py-2 text-sm font-medium rounded-md inline-flex items-center shadow-sm">
+              <i class="fa-brands fa-google mr-2"></i> Connect Google Account
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2: Spreadsheet Selection -->
+    <section class="polaris-card p-6 mb-6">
+      <div class="pb-4 border-b border-gray-100 mb-5">
+        <h2 class="text-base font-semibold text-gray-800 flex items-center">
+          <span class="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-2 font-bold">2</span>
+          Target Google Spreadsheet & Tab
+        </h2>
+        <p class="text-sm text-gray-500 mt-0.5">Specify where incoming Shopify orders should be placed.</p>
+      </div>
+
+      <form id="saveSettingsForm" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Google Spreadsheet ID or URL</label>
+            <input type="text" id="spreadsheetIdInput" name="spreadsheet_id" value="{{ store.spreadsheet_id or '' }}" 
+                   placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" 
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+            <span class="text-xs text-gray-400">Found in the URL of your Google Sheet.</span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Worksheet / Tab Name</label>
+            <input type="text" id="sheetTabInput" name="sheet_tab" value="{{ store.sheet_tab or 'Orders' }}" 
+                   placeholder="e.g. Orders" 
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+            <span class="text-xs text-gray-400">If the tab doesn't have headers, we automatically insert them.</span>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button type="submit" class="btn-shopify px-4 py-2 text-sm font-medium rounded-md shadow-sm">
+            Save Sync Settings
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 3: Test & Live Simulation -->
+    <section class="polaris-card p-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-gray-800 flex items-center">
+            <span class="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-2 font-bold">3</span>
+            Test Connection with a Sample Order
+          </h2>
+          <p class="text-sm text-gray-500 mt-0.5">Simulate an incoming order right now to confirm rows are written properly.</p>
+        </div>
+        <div class="mt-4 md:mt-0">
+          <button id="testOrderBtn" class="btn-secondary px-4 py-2 text-sm font-medium rounded-md inline-flex items-center shadow-sm">
+            <i class="fa-solid fa-paper-plane mr-2 text-emerald-600"></i> Send Test Order
+          </button>
+        </div>
+      </div>
+      <div id="testResultBox" class="mt-4 hidden p-3 rounded-md text-xs"></div>
+    </section>
+
+  </main>
+
+  <script>
+    const shop = "{{ shop }}";
+
+    // Save Settings
+    document.getElementById("saveSettingsForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const spreadsheet_id = document.getElementById("spreadsheetIdInput").value.trim();
+      const sheet_tab = document.getElementById("sheetTabInput").value.trim();
+
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shop, spreadsheet_id, sheet_tab })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("Settings saved successfully!");
+        window.location.reload();
+      } else {
+        alert("Error saving settings: " + (data.detail || "Unknown error"));
+      }
+    });
+
+    // Send Test Order
+    document.getElementById("testOrderBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("testOrderBtn");
+      const box = document.getElementById("testResultBox");
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Sending...`;
+      box.classList.add("hidden");
+
+      try {
+        const res = await fetch(`/api/test-sync?shop=${encodeURIComponent(shop)}`, { method: "POST" });
+        const data = await res.json();
+        box.classList.remove("hidden");
+        if (res.ok) {
+          box.className = "mt-4 p-3 rounded-md text-xs bg-emerald-50 text-emerald-800 border border-emerald-200";
+          box.innerHTML = `<strong>Success!</strong> Test order #${data.order_name} successfully appended to Google Sheets!`;
+          document.getElementById("syncCount").innerText = parseInt(document.getElementById("syncCount").innerText || 0) + 1;
+        } else {
+          box.className = "mt-4 p-3 rounded-md text-xs bg-rose-50 text-rose-800 border border-rose-200";
+          box.innerHTML = `<strong>Notice:</strong> ${data.detail || "Could not write to Google Sheet. Check your Google Account connection and Sheet ID."}`;
+        }
+      } catch (err) {
+        box.classList.remove("hidden");
+        box.className = "mt-4 p-3 rounded-md text-xs bg-rose-50 text-rose-800 border border-rose-200";
+        box.innerHTML = `<strong>Network Error:</strong> ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane mr-2 text-emerald-600"></i> Send Test Order`;
+      }
+    });
+  </script>
+</body>
+</html>
